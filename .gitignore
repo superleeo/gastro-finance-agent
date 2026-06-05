@@ -1,0 +1,34 @@
+# 敏感数据目录
+input_bank/
+input_raw/
+output/
+organized_data/
+email_drafts/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# 环境
+.env
+.env.local
+.env.production
+*.key
+*.pem
+# .env.example 被跟踪（模板文件）
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# 日志
+logs/
+*.log
