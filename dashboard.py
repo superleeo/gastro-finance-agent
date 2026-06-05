@@ -32,6 +32,7 @@ from config import (
     restaurant as cfg, logger,
 )
 from finanz_dashboard import page_finanzanalyse
+from settings_page import page_settings
 from reconciliation import (
     BankTransaction, InvoiceRecord, MissingInvoice, ReconciliationReport,
     parse_bank_csv, filter_expenses, fuzzy_match_invoices,
@@ -179,6 +180,7 @@ def render_sidebar() -> None:
         ("概览", "📊"), ("财务分析", "📈"),
         ("智能对账", "💳"), ("供应商", "🏪"),
         ("任务日志", "🖥"), ("报表", "📑"),
+        ("设置", "⚙️"),
     ]
     active_page = st.session_state.get("page", "概览")
 
@@ -204,7 +206,6 @@ def render_sidebar() -> None:
 
     st.markdown("---")
     st.button("⚡ 执行自动平账", type="primary", use_container_width=True)
-    st.button("⚙ 设置", use_container_width=True)
     st.button("❓ 帮助中心", use_container_width=True)
 
     st.markdown(
@@ -730,6 +731,7 @@ def main() -> None:
     elif page == "任务日志": page_tasks()
     elif page == "供应商": page_vendors()
     elif page == "报表": page_reports()
+    elif page == "设置": page_settings()
     else: page_overview()
 
 
