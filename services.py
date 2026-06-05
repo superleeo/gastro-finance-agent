@@ -77,7 +77,7 @@ class ReconciliationService:
     使用方式:
         svc = ReconciliationService(progress_callback=st.info)
         result = svc.run_full_reconciliation()
-        result = svc.reconcile_uploaded_csv(uploaded_bytes, filename)
+        result = svc.reconcile_uploaded_statement(uploaded_bytes, filename)
     """
 
     def __init__(
@@ -125,22 +125,25 @@ class ReconciliationService:
                 error_message=str(exc),
             )
 
-    # ── 上传 CSV 对账 ──
+    # ── 上传文件对账（CSV + PDF）──
 
-    def reconcile_uploaded_csv(
+    def reconcile_uploaded_statement(
         self,
         uploaded_bytes: bytes,
         filename: str,
         invoices: Optional[List[InvoiceRecord]] = None,
+        use_ocr: bool = False,
     ) -> ReconciliationResult:
         """
-        解析用户上传的银行 CSV，执行对账。
+        解析用户上传的银行对账单（CSV 或 PDF），执行对账。
 
         uploaded_bytes: 文件原始字节
-        filename: 原始文件名（用于日志）
+        filename: 原始文件名（用于判断 .csv 或 .pdf）
+        use_ocr: 是否对扫描件 PDF 启用 OCR
         """
         import tempfile
         tmp_path: Optional[Path] = None
+        suffix = Path(filename).suffix.lower()
 
         try:
             if invoices is None:
@@ -151,16 +154,34 @@ class ReconciliationService:
                 return ReconciliationResult(success=False, error_message="上传文件为空")
             if len(uploaded_bytes) > 10 * 1024 * 1024:
                 return ReconciliationResult(success=False, error_message="文件超过 10MB 限制")
-            if b"\x00" in uploaded_bytes[:512]:
-                return ReconciliationResult(success=False, error_message="文件不是有效文本格式")
+
+            # CSV 需要检查二进制；PDF 有自己格式
+            if suffix == ".csv":
+                if b"\x00" in uploaded_bytes[:512]:
+                    return ReconciliationResult(success=False, error_message="文件不是有效文本格式")
+                tmp_suffix = ".csv"
+            elif suffix == ".pdf":
+                if not uploaded_bytes[:4] == b"%PDF":
+                    return ReconciliationResult(success=False, error_message="不是有效的 PDF 文件")
+                tmp_suffix = ".pdf"
+            else:
+                return ReconciliationResult(success=False, error_message=f"不支持的文件格式: {suffix}")
 
             # 写入临时文件
-            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="wb") as tmp:
+            with tempfile.NamedTemporaryFile(suffix=tmp_suffix, delete=False, mode="wb") as tmp:
                 tmp.write(uploaded_bytes)
                 tmp_path = Path(tmp.name)
 
             self._progress(f"正在解析 {filename}…")
-            transactions = parse_bank_csv(tmp_path)
+            if suffix == ".pdf":
+                from pdf_parser import parse_pdf, parse_scanned_pdf
+                transactions = parse_pdf(tmp_path)
+                if not transactions and use_ocr:
+                    self._progress("文本提取为空，尝试 OCR…")
+                    transactions = parse_scanned_pdf(tmp_path)
+            else:
+                transactions = parse_bank_csv(tmp_path)
+
             expenses = filter_expenses(transactions)
             self._progress(f"解析完成: {len(transactions)} 笔交易 ({len(expenses)} 笔支出)")
 
@@ -190,7 +211,7 @@ class ReconciliationService:
             )
 
         except Exception as exc:
-            logger.exception("上传 CSV 对账异常")
+            logger.exception("上传文件对账异常")
             return ReconciliationResult(success=False, error_message=str(exc))
         finally:
             if tmp_path is not None:
@@ -198,6 +219,11 @@ class ReconciliationService:
                     tmp_path.unlink(missing_ok=True)
                 except Exception:
                     pass
+
+    # 向后兼容别名
+    def reconcile_uploaded_csv(self, *args, **kwargs) -> ReconciliationResult:
+        """已弃用，请使用 reconcile_uploaded_statement"""
+        return self.reconcile_uploaded_statement(*args, **kwargs)
 
     # ── 生成催收邮件 ──
 

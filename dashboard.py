@@ -536,9 +536,14 @@ def page_vendors() -> None:
     st.markdown("---")
     cu1, cu2 = st.columns(2)
     with cu1:
-        st.subheader("📂 上传银行 CSV")
-        uploaded = st.file_uploader("选择 CSV 文件", type=["csv"], key="v_csv", help="最大 10MB")
+        st.subheader("📂 上传银行对账单（CSV / PDF）")
+        uploaded = st.file_uploader(
+            "选择 CSV 或 PDF 文件", type=["csv", "pdf"],
+            key="v_csv", help="支持 CSV 和 PDF 格式，最大 10MB",
+        )
         if uploaded:
+            filename = uploaded.name
+            suffix = Path(filename).suffix.lower()
             if uploaded.size > 10 * 1024 * 1024:
                 st.error("文件过大（最大 10MB）。")
             elif uploaded.size == 0:
@@ -546,20 +551,38 @@ def page_vendors() -> None:
             else:
                 tmp_path = None
                 try:
-                    header = uploaded.getvalue()[:512]
-                    if b"\x00" in header:
-                        st.error("检测到二进制文件 — 不是有效的 CSV。")
-                    else:
-                        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="wb") as tmp:
-                            tmp.write(uploaded.getvalue())
-                            tmp_path = Path(tmp.name)
-                        txns = parse_bank_csv(tmp_path)
-                        expenses = filter_expenses(txns)
-                        st.session_state.bank_transactions = expenses
-                        st.success(f"✓ 已解析 {len(txns)} 笔交易（{len(expenses)} 笔支出）")
-                        missing, matched = fuzzy_match_invoices(expenses, invoices)
-                        st.session_state.missing_invoices = missing
-                        st.info(f"已匹配 {matched} 笔，缺失 {len(missing)} 笔")
+                    if suffix == ".pdf":
+                        if uploaded.getvalue()[:4] != b"%PDF":
+                            st.error("不是有效的 PDF 文件。")
+                        else:
+                            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False, mode="wb") as tmp:
+                                tmp.write(uploaded.getvalue())
+                                tmp_path = Path(tmp.name)
+                            from pdf_parser import parse_pdf
+                            txns = parse_pdf(tmp_path)
+                            if not txns:
+                                st.warning("PDF 中未提取到文本。如果是扫描件，请使用 OCR 模式。")
+                            expenses = filter_expenses(txns)
+                            st.session_state.bank_transactions = expenses
+                            st.success(f"✓ 已解析 {len(txns)} 笔交易（{len(expenses)} 笔支出）")
+                            missing, matched = fuzzy_match_invoices(expenses, invoices)
+                            st.session_state.missing_invoices = missing
+                            st.info(f"已匹配 {matched} 笔，缺失 {len(missing)} 笔")
+                    else:  # CSV
+                        header_sample = uploaded.getvalue()[:512]
+                        if b"\x00" in header_sample:
+                            st.error("检测到二进制文件 — 不是有效的 CSV。")
+                        else:
+                            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="wb") as tmp:
+                                tmp.write(uploaded.getvalue())
+                                tmp_path = Path(tmp.name)
+                            txns = parse_bank_csv(tmp_path)
+                            expenses = filter_expenses(txns)
+                            st.session_state.bank_transactions = expenses
+                            st.success(f"✓ 已解析 {len(txns)} 笔交易（{len(expenses)} 笔支出）")
+                            missing, matched = fuzzy_match_invoices(expenses, invoices)
+                            st.session_state.missing_invoices = missing
+                            st.info(f"已匹配 {matched} 笔，缺失 {len(missing)} 笔")
                 except Exception as exc:
                     st.error(f"解析失败: {exc}")
                 finally:

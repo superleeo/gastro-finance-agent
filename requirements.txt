@@ -7,5 +7,13 @@ streamlit>=1.28.0
 chardet>=5.0.0
 python-dateutil>=2.8.0
 pydantic>=2.0.0
+pdfplumber>=0.10.0       # PDF 银行对账单解析
+
+# 测试
 pytest>=8.0.0
 pytest-cov>=5.0.0
+
+# 可选: OCR 扫描件支持
+# pytesseract>=0.3.0
+# pdf2image>=1.16.0
+# 系统依赖: brew install tesseract (macOS) / apt install tesseract-ocr (Linux)
