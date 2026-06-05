@@ -106,7 +106,7 @@ def build_revenue_composition_chart(summary: PeriodSummary) -> alt.Chart:
     pie = base.mark_arc(outerRadius=90, innerRadius=50)
     text = base.mark_text(radius=115, size=11, fontWeight="bold").encode(text=alt.Text("Betrag:Q", format="€,.0f"))
     return (pie + text).properties(
-        title=alt.TitleParams("Umsatz Zusammensetzung", fontSize=14, fontWeight="bold", color=C_GREEN),
+        title=alt.TitleParams("营业额构成（食品 vs 饮品）", fontSize=14, fontWeight="bold", color=C_GREEN),
         height=280, width=280,
     ).configure_view(strokeWidth=0)
 
@@ -114,13 +114,13 @@ def build_revenue_composition_chart(summary: PeriodSummary) -> alt.Chart:
 def build_cost_breakdown_chart(summary: PeriodSummary) -> alt.Chart:
     """成本构成横向柱状图"""
     cats = [
-        ("Wareneinsatz", float(summary.wareneinsatz)),
-        ("Personal", float(summary.personal)),
-        ("Miete", float(summary.miete)),
-        ("Energie", float(summary.energie)),
-        ("Versicherung", float(summary.versicherung)),
-        ("Marketing", float(summary.marketing)),
-        ("Sonstiges", float(summary.sonstiges)),
+        ("食材成本", float(summary.wareneinsatz)),
+        ("人工成本", float(summary.personal)),
+        ("租金", float(summary.miete)),
+        ("能源", float(summary.energie)),
+        ("保险", float(summary.versicherung)),
+        ("营销", float(summary.marketing)),
+        ("其他", float(summary.sonstiges)),
     ]
     df = pd.DataFrame(cats, columns=["Kategorie", "Betrag"])
     df["Prozent"] = (df["Betrag"] / float(summary.brutto_total) * 100).round(1)
@@ -133,7 +133,7 @@ def build_cost_breakdown_chart(summary: PeriodSummary) -> alt.Chart:
         tooltip=[alt.Tooltip("Kategorie:N"), alt.Tooltip("Betrag:Q", format="€,.0f"),
                  alt.Tooltip("Prozent:Q", format=".1f", title="Anteil %")],
     ).properties(
-        title=alt.TitleParams("Kostenstruktur", fontSize=14, fontWeight="bold", color=C_GREEN),
+        title=alt.TitleParams("成本结构分析", fontSize=14, fontWeight="bold", color=C_GREEN),
         height=260, width=350,
     ).configure_view(strokeWidth=0)
 
@@ -151,8 +151,8 @@ def build_trend_chart(summaries: List[PeriodSummary], metric: str = "brutto_tota
 
     base = alt.Chart(df).mark_line(point=alt.OverlayMarkDef(size=50, filled=True), strokeWidth=2.5).encode(
         x=alt.X("Periode:N", title=None, sort=None, axis=alt.Axes(labelAngle=-45, labelFontSize=10)),
-        tooltip=[alt.Tooltip("Periode:N"), alt.Tooltip("Umsatz (€):Q", format="€,.0f"),
-                 alt.Tooltip("Kosten (€):Q", format="€,.0f"), alt.Tooltip("EBITDA (€):Q", format="€,.0f")],
+        tooltip=[alt.Tooltip("Periode:N"), alt.Tooltip("营业额 (€):Q", format="€,.0f"),
+                 alt.Tooltip("成本 (€):Q", format="€,.0f"), alt.Tooltip("EBITDA (€):Q", format="€,.0f")],
     )
 
     rev_line = base.encode(y=alt.Y("Umsatz (€):Q", title="EUR", axis=alt.Axes(format="€,.0f")),
@@ -162,7 +162,7 @@ def build_trend_chart(summaries: List[PeriodSummary], metric: str = "brutto_tota
     ebitda_line = base.encode(y=alt.Y("EBITDA (€):Q"), color=alt.value(C_BLUE))
 
     return (rev_line + cost_line + ebitda_line).properties(
-        title=alt.TitleParams("Finanz-Trend", fontSize=14, fontWeight="bold", color=C_GREEN),
+        title=alt.TitleParams("财务趋势图", fontSize=14, fontWeight="bold", color=C_GREEN),
     ).configure_view(strokeWidth=0)
 
 
@@ -173,25 +173,25 @@ def build_tax_comparison_chart(ebitda: Decimal) -> alt.Chart:
 
     rows = []
     for label, g_val, e_val in [
-        ("Gewerbesteuer", float(tax_g.gewerbesteuer), float(tax_e.gewerbesteuer)),
-        ("Körperschaftsteuer", float(tax_g.koerperschaftsteuer), 0),
-        ("Soli", float(tax_g.soli), 0),
-        ("Einkommensteuer", 0, float(tax_e.einkommensteuer)),
-        ("Netto Gewinn", float(tax_g.net_profit), float(tax_e.net_profit)),
+        ("营业税 GewSt", float(tax_g.gewerbesteuer), float(tax_e.gewerbesteuer)),
+        ("公司税 KSt", float(tax_g.koerperschaftsteuer), 0),
+        ("团结税 Soli", float(tax_g.soli), 0),
+        ("个人所得税 ESt", 0, float(tax_e.einkommensteuer)),
+        ("净利润", float(tax_g.net_profit), float(tax_e.net_profit)),
     ]:
-        rows.append({"Steuerart": label, "GmbH (€)": g_val, "Einzelunternehmen (€)": e_val})
+        rows.append({"税种": label, "GmbH (€)": g_val, "个体经营 (€)": e_val})
 
     df = pd.DataFrame(rows)
-    df_melt = df.melt(id_vars=["Steuerart"], var_name="Rechtsform", value_name="Betrag")
+    df_melt = df.melt(id_vars=["税种"], var_name="企业形式", value_name="金额 (€)")
 
     return alt.Chart(df_melt).mark_bar(cornerRadius=4).encode(
-        x=alt.X("Betrag:Q", title="EUR", axis=alt.Axes(format="€,.0f")),
-        y=alt.Y("Steuerart:N", title=None, sort=df["Steuerart"].tolist()),
-        color=alt.Color("Rechtsform:N", scale=alt.Scale(range=[C_GREEN, C_GOLD])),
-        row=alt.Row("Rechtsform:N", title=None, header=alt.Header(labelFontSize=12, labelFontWeight="bold")),
-        tooltip=["Steuerart:N", alt.Tooltip("Betrag:Q", format="€,.2f")],
+        x=alt.X("金额 (€):Q", title="EUR", axis=alt.Axes(format="€,.0f")),
+        y=alt.Y("税种:N", title=None, sort=df["税种"].tolist()),
+        color=alt.Color("企业形式:N", scale=alt.Scale(range=[C_GREEN, C_GOLD])),
+        row=alt.Row("企业形式:N", title=None, header=alt.Header(labelFontSize=12, labelFontWeight="bold")),
+        tooltip=["税种:N", alt.Tooltip("金额 (€):Q", format="€,.2f")],
     ).properties(
-        title=alt.TitleParams("Steuervergleich GmbH vs Einzelunternehmen", fontSize=14, fontWeight="bold"),
+        title=alt.TitleParams("税务对比：GmbH vs 个体经营", fontSize=14, fontWeight="bold"),
         height=200, width=500,
     ).configure_view(strokeWidth=0)
 
@@ -216,37 +216,37 @@ def page_finanzanalyse() -> None:
     st.markdown("""
     <div style="display:flex;align-items:center;justify-content:space-between;
                 padding:8px 0 16px 0;border-bottom:1px solid #bfc9c3;margin-bottom:20px;">
-        <div style="font-size:24px;font-weight:700;color:#003527;">📊 Finanzanalyse</div>
+        <div style="font-size:24px;font-weight:700;color:#003527;">📊 财务分析</div>
     </div>
     """, unsafe_allow_html=True)
 
     ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([2, 2, 2, 1])
     with ctrl1:
-        period = st.selectbox("Zeitraum", ["Tag", "Woche", "Monat", "Jahr"],
+        period = st.selectbox("时间范围", ["Tag", "Woche", "Monat", "Jahr"],
                               index=2, key="fa_period",
-                              format_func=lambda x: {"Tag": "📅 Heute",
-                                                      "Woche": "📆 Diese Woche",
-                                                      "Monat": "🗓 Dieser Monat",
-                                                      "Jahr": "📅 Dieses Jahr"}[x])
+                              format_func=lambda x: {"Tag": "📅 今天",
+                                                      "Woche": "📆 本周",
+                                                      "Monat": "🗓 本月",
+                                                      "Jahr": "📅 今年"}[x])
     with ctrl2:
-        year_choice = st.selectbox("Jahr", ["2026", "2025"],
+        year_choice = st.selectbox("年份", ["2026", "2025"],
                                    index=0, key="fa_year")
     with ctrl3:
-        biz_type = st.radio("Rechtsform",
+        biz_type = st.radio("企业形式",
                             ["GmbH", "Einzelunternehmen"],
                             horizontal=True, key="fa_biz",
-                            format_func=lambda x: f"🏢 {x}" if x == "GmbH" else f"👤 {x}")
+                            format_func=lambda x: f"🏢 {x} (有限责任公司)" if x == "GmbH" else f"👤 {x} (个体经营)")
     with ctrl4:
         st.markdown("<br>", unsafe_allow_html=True)
-        use_demo = st.checkbox("Demo Daten", value=cfg.demo_mode, key="fa_demo",
-                               help="Demo-Daten mit realistischen Werten")
+        use_demo = st.checkbox("演示数据", value=cfg.demo_mode, key="fa_demo",
+                               help="使用逼真的模拟数据演示")
 
     bt = BusinessType.GMBH if biz_type == "GmbH" else BusinessType.EINZELUNTERNEHMEN
     tp = {"Tag": TimePeriod.DAY, "Woche": TimePeriod.WEEK,
           "Monat": TimePeriod.MONTH, "Jahr": TimePeriod.YEAR}[period]
 
     if not data and not use_demo:
-        st.warning("Keine Daten vorhanden. Bitte zuerst Z-Bons erfassen oder Demo-Modus aktivieren.")
+        st.warning("暂无数据。请先采集 Z-Bon 小票数据，或勾选「演示数据」使用模拟数据。")
         return
 
     if use_demo and not data:
@@ -283,16 +283,16 @@ def page_finanzanalyse() -> None:
 
     mc1, mc2, mc3, mc4, mc5 = st.columns(5)
     with mc1:
-        st.markdown(metric_card_html(f"€{ue_total:,.0f}", "Umsatz (brutto)", rev_delta, C_GREEN, "💰"), unsafe_allow_html=True)
+        st.markdown(metric_card_html(f"€{ue_total:,.0f}", "营业额（含税）", rev_delta, C_GREEN, "💰"), unsafe_allow_html=True)
     with mc2:
-        st.markdown(metric_card_html(f"€{costs:,.0f}", "Gesamtkosten", cost_delta, C_RED if cost_delta.startswith("+") else C_GRAY, "📉"), unsafe_allow_html=True)
+        st.markdown(metric_card_html(f"€{costs:,.0f}", "总成本", cost_delta, C_RED if cost_delta.startswith("+") else C_GRAY, "📉"), unsafe_allow_html=True)
     with mc3:
-        st.markdown(metric_card_html(f"€{ebitda_val:,.0f}", "EBITDA", margin_delta, C_BLUE, "📈"), unsafe_allow_html=True)
+        st.markdown(metric_card_html(f"€{ebitda_val:,.0f}", "EBITDA（利润）", margin_delta, C_BLUE, "📈"), unsafe_allow_html=True)
     with mc4:
-        st.markdown(metric_card_html(f"{margin:.1f}%", "Gewinnmarge", margin_delta, C_GREEN if margin > 10 else C_ORANGE, "🎯"), unsafe_allow_html=True)
+        st.markdown(metric_card_html(f"{margin:.1f}%", "净利润率", margin_delta, C_GREEN if margin > 10 else C_ORANGE, "🎯"), unsafe_allow_html=True)
     with mc5:
         tax_eff = taxes.tax_rate_effective
-        st.markdown(metric_card_html(f"€{float(taxes.total_tax):,.0f}", f"Steuer ({tax_eff:.0f}%)",
+        st.markdown(metric_card_html(f"€{float(taxes.total_tax):,.0f}", f"预估税款（{tax_eff:.0f}%）",
                                      "", C_RED if tax_eff > 30 else C_GRAY, "🧾"), unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -314,16 +314,16 @@ def page_finanzanalyse() -> None:
 
     # ── 详细数据表 ──────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
-    with st.expander("📋 Detaildaten (Tabelle)", expanded=False):
+    with st.expander("📋 详细数据（表格）", expanded=False):
         df_table = pd.DataFrame([{
-            "Periode": s.period_label, "Tage": s.days,
-            "Umsatz €": f"{float(s.brutto_total):,.0f}",
-            "Kosten €": f"{float(s.total_costs):,.0f}",
+            "周期": s.period_label, "天数": s.days,
+            "营业额 €": f"{float(s.brutto_total):,.0f}",
+            "成本 €": f"{float(s.total_costs):,.0f}",
             "EBITDA €": f"{float(s.ebitda):,.0f}",
-            "Marge %": f"{s.profit_margin:.1f}",
-            "∅/Tag €": f"{float(s.avg_daily_revenue):,.0f}",
-            "Personal %": f"{float(s.personal/s.brutto_total*100):.0f}" if s.brutto_total > 0 else "0",
-            "Ware %": f"{float(s.wareneinsatz/s.brutto_total*100):.0f}" if s.brutto_total > 0 else "0",
+            "利润率 %": f"{s.profit_margin:.1f}",
+            "日均 €": f"{float(s.avg_daily_revenue):,.0f}",
+            "人工 %": f"{float(s.personal/s.brutto_total*100):.0f}" if s.brutto_total > 0 else "0",
+            "食材 %": f"{float(s.wareneinsatz/s.brutto_total*100):.0f}" if s.brutto_total > 0 else "0",
         } for s in summaries])
         st.dataframe(df_table, use_container_width=True, hide_index=True)
 
@@ -336,20 +336,20 @@ def page_finanzanalyse() -> None:
     with tax_col2:
         st.markdown(f"""
         <div style="border:1px solid #bfc9c3;border-radius:12px;padding:20px;background:white;">
-            <h4 style="font-size:14px;font-weight:700;color:{C_GREEN};margin:0 0 12px 0;">🧾 Steuerdetails — {biz_type}</h4>
+            <h4 style="font-size:14px;font-weight:700;color:{C_GREEN};margin:0 0 12px 0;">🧾 税务明细 — {biz_type}</h4>
             <table style="width:100%;font-size:13px;border-collapse:collapse;">
-                <tr><td style="padding:6px 0;color:{C_GRAY};">Gewerbesteuer</td><td style="text-align:right;font-family:monospace;">€{float(taxes.gewerbesteuer):,.2f}</td></tr>
-                {f'<tr><td style="padding:6px 0;color:{C_GRAY};">Körperschaftsteuer (15%)</td><td style="text-align:right;font-family:monospace;">€{float(taxes.koerperschaftsteuer):,.2f}</td></tr><tr><td style="padding:6px 0;color:{C_GRAY};">Soli (5.5%)</td><td style="text-align:right;font-family:monospace;">€{float(taxes.soli):,.2f}</td></tr>' if bt == BusinessType.GMBH else f'<tr><td style="padding:6px 0;color:{C_GRAY};">Einkommensteuer (prog.)</td><td style="text-align:right;font-family:monospace;">€{float(taxes.einkommensteuer):,.2f}</td></tr>'}
-                <tr style="border-top:2px solid #bfc9c3;"><td style="padding:8px 0;font-weight:700;">Gesamtsteuer</td><td style="text-align:right;font-family:monospace;font-weight:700;color:{C_RED};">€{float(taxes.total_tax):,.2f}</td></tr>
-                <tr><td style="padding:4px 0;font-weight:700;color:{C_GREEN};">Netto Gewinn</td><td style="text-align:right;font-family:monospace;font-weight:700;color:{C_GREEN};">€{float(taxes.net_profit):,.2f}</td></tr>
+                <tr><td style="padding:6px 0;color:{C_GRAY};">营业税 (GewSt)</td><td style="text-align:right;font-family:monospace;">€{float(taxes.gewerbesteuer):,.2f}</td></tr>
+                {f'<tr><td style="padding:6px 0;color:{C_GRAY};">公司税 KSt (15%)</td><td style="text-align:right;font-family:monospace;">€{float(taxes.koerperschaftsteuer):,.2f}</td></tr><tr><td style="padding:6px 0;color:{C_GRAY};">团结税 Soli (5.5%)</td><td style="text-align:right;font-family:monospace;">€{float(taxes.soli):,.2f}</td></tr>' if bt == BusinessType.GMBH else f'<tr><td style="padding:6px 0;color:{C_GRAY};">个人所得税 ESt (累进)</td><td style="text-align:right;font-family:monospace;">€{float(taxes.einkommensteuer):,.2f}</td></tr>'}
+                <tr style="border-top:2px solid #bfc9c3;"><td style="padding:8px 0;font-weight:700;">总税款</td><td style="text-align:right;font-family:monospace;font-weight:700;color:{C_RED};">€{float(taxes.total_tax):,.2f}</td></tr>
+                <tr><td style="padding:4px 0;font-weight:700;color:{C_GREEN};">净利润</td><td style="text-align:right;font-family:monospace;font-weight:700;color:{C_GREEN};">€{float(taxes.net_profit):,.2f}</td></tr>
             </table>
-            <p style="font-size:10px;color:{C_GRAY};margin-top:8px;">Effektive Steuerlast: {tax_eff:.1f}% | Hebesatz: {float(DEFAULT_HEBESATZ):.0f}%</p>
+            <p style="font-size:10px;color:{C_GRAY};margin-top:8px;">有效税率: {tax_eff:.1f}% | 地方稽征率: {float(DEFAULT_HEBESATZ):.0f}%</p>
         </div>
         """, unsafe_allow_html=True)
 
     # ── AI 建议面板 ─────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader("🤖 KI-Empfehlungen")
+    st.subheader("🤖 AI 智能建议")
 
     recs = generate_recommendations(latest, prev, bt)
     for r in recs:
