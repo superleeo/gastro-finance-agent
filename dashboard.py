@@ -653,6 +653,52 @@ def page_reports() -> None:
         else:
             st.caption("暂无邮件草稿。请先执行对账并生成邮件。")
 
+    # ── 月度 Kassenabrechnung ─────────────────────────────
+    st.markdown("---")
+    st.subheader("📋 月度 Kassenabrechnung 生成")
+
+    kr1, kr2, kr3 = st.columns([2, 2, 1])
+    today = date.today()
+    with kr1:
+        report_year = st.selectbox("年份", list(range(2020, today.year + 1)),
+                                   index=len(range(2020, today.year + 1)) - 1, key="ka_year")
+    with kr2:
+        report_month = st.selectbox("月份", list(range(1, 13)),
+                                    index=today.month - 1 if today.day > 5 else max(0, today.month - 2),
+                                    key="ka_month",
+                                    format_func=lambda m: f"{m}月")
+    with kr3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        gen_btn = st.button("📄 生成报表", type="primary", use_container_width=True, key="ka_gen")
+
+    if gen_btn:
+        with st.spinner(f"正在生成 {report_year} 年 {report_month} 月 Kassenabrechnung…"):
+            try:
+                from financial_analytics import generate_demo_data
+                from kassenabrechnung import build_report_from_daily_data, generate_kassenabrechnung, export_to_pdf
+
+                if st.session_state.demo_mode:
+                    data = generate_demo_data(180)
+                else:
+                    data = []
+                report = build_report_from_daily_data(data, year=report_year, month=report_month)
+                xlsx_path = generate_kassenabrechnung(report)
+                st.success(f"✅ Excel 已生成: `{xlsx_path.name}`")
+
+                # 尝试 PDF
+                pdf_path = export_to_pdf(xlsx_path)
+                if pdf_path:
+                    st.success(f"✅ PDF 已生成: `{pdf_path.name}`")
+                else:
+                    st.info("💡 安装 LibreOffice 可自动生成 PDF：`brew install libreoffice`")
+
+                # 预览
+                if report.days:
+                    st.metric("总营业额 (含税)", f"€{float(report.total_einnahme):,.2f}")
+                    st.metric("期末余额", f"€{float(report.endbestand):,.2f}")
+            except Exception as exc:
+                st.error(f"生成失败: {exc}")
+
 
 # ══════════════════════════════════════════ 主入口 ═════════════════════════════════════════
 
